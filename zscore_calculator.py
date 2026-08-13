@@ -2,31 +2,86 @@ import pandas as pd
 
 def calculate_z_scores(file_path):
     """
-    Loads an Excel file, calculates Z-scores and related metrics,
-    and returns the updated DataFrame and the global quantitative score.
+    Charge le fichier Excel et calcule :
+    - Moyenne Historique
+    - Ecart-Type
+    - Z-Score
+    - Z Ajusté
+    - Score Pondéré
+    - Score Quantitatif Global
     """
+
+    # Lecture du fichier Excel
     df = pd.read_excel(file_path)
 
-    # 1. Calculer la Moyenne Historique sur les colonnes N-5 à N-1
-    df['Moyenne Historique Calculée'] = df[['N-5', 'N-4', 'N-3', 'N-2', 'N-1']].mean(axis=1)
+    # =====================================================
+    # 1. MOYENNE HISTORIQUE
+    # =====================================================
 
-    # 2. Calculer l'Écart-Type sur les colonnes N-5 à N-1 (ddof=0 pour l'écart-type de la population)
-    df['Ecart-Type Calculé'] = df[['N-5', 'N-4', 'N-3', 'N-2', 'N-1']].std(axis=1, ddof=0)
+    historique_cols = ['N-5', 'N-4', 'N-3', 'N-2', 'N-1']
 
-    # 3. Calculer le Z-Score
-    # Gérer la division par zéro si l'écart-type est 0 pour éviter les erreurs
-    df['Z-Score Calculé'] = df.apply(lambda row:
-        (row['N'] - row['Moyenne Historique Calculée']) / row['Ecart-Type Calculé']
-        if row['Ecart-Type Calculé'] != 0 else 0, axis=1)
+    df['Moyenne Historique Calculée'] = (
+        df[historique_cols]
+        .mean(axis=1)
+    )
 
-    # 4. Calculer le Z Ajusté
-    df['Z Ajusté Calculé'] = df['Z-Score Calculé'].abs()
+    # =====================================================
+    # 2. ECART-TYPE
+    # =====================================================
 
-    # 5. Calculer le Score Pondéré
-    # Convertir 'Poids %' en décimal avant de multiplier
-    df['Score Pondéré Calculé'] = df['Z Ajusté Calculé'] * (df['Poids %'] / 100)
+    df['Ecart-Type Calculé'] = (
+        df[historique_cols]
+        .std(axis=1, ddof=0)
+    )
 
-    # 6. Calculer le Score Quantitatif Global
-    score_quantitatif_global = df['Score Pondéré Calculé'].sum()
+    # =====================================================
+    # 3. Z-SCORE
+    # =====================================================
+
+    def calcul_z_score(row):
+
+        if row['Ecart-Type Calculé'] == 0:
+            return 0
+
+        return (
+            (row['N'] - row['Moyenne Historique Calculée'])
+            / row['Ecart-Type Calculé']
+        )
+
+    df['Z-Score Calculé'] = df.apply(
+        calcul_z_score,
+        axis=1
+    )
+
+    # =====================================================
+    # 4. Z AJUSTE
+    # =====================================================
+
+    df['Z Ajusté Calculé'] = (
+        df['Z-Score Calculé']
+        .abs()
+    )
+
+    # =====================================================
+    # 5. SCORE PONDERE
+    # =====================================================
+
+    df['Score Pondéré Calculé'] = (
+        df['Z Ajusté Calculé']
+        * df['Poids %']
+    )
+
+    # =====================================================
+    # 6. SCORE GLOBAL
+    # =====================================================
+
+    score_quantitatif_global = round(
+        df['Score Pondéré Calculé'].sum(),
+        2
+    )
+
+    # =====================================================
+    # RESULTAT
+    # =====================================================
 
     return df, score_quantitatif_global
