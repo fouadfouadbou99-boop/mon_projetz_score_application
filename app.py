@@ -21,12 +21,13 @@ st.set_page_config(
 st.title("📈 Application de Calcul de Z-Score")
 
 st.write(
-    "Veuillez télécharger votre fichier Excel afin de calculer les "
-    "Z-Scores et le Score Quantitatif Global."
+    "Veuillez télécharger votre fichier Excel afin de calculer "
+    "les Z-Scores, le Score Quantitatif Global et générer "
+    "un rapport Excel complet."
 )
 
 # =====================================================
-# UPLOAD FICHIER
+# IMPORT FICHIER
 # =====================================================
 
 uploaded_file = st.file_uploader(
@@ -45,21 +46,21 @@ if uploaded_file is not None:
     with open(temp_file_path, "wb") as f:
         f.write(uploaded_file.getbuffer())
 
-    st.success("Fichier chargé avec succès !")
+    st.success("✅ Fichier chargé avec succès")
 
     try:
 
-        # ===================================
+        # =================================================
         # CALCULS
-        # ===================================
+        # =================================================
 
         df_results, global_score = calculate_z_scores(
             temp_file_path
         )
 
-        # ===================================
-        # SCORE PONDERE
-        # ===================================
+        # =================================================
+        # CONTROLE SCORE PONDERE
+        # =================================================
 
         if "Score Pondéré Calculé" not in df_results.columns:
 
@@ -68,11 +69,11 @@ if uploaded_file is not None:
                 * df_results["Z Ajusté Calculé"]
             )
 
-        # ===================================
-        # APERÇU RESULTATS
-        # ===================================
+        # =================================================
+        # TABLEAU DETAILLE
+        # =================================================
 
-        st.subheader("📊 Aperçu des Z-Scores Calculés")
+        st.subheader("📊 Aperçu des Résultats")
 
         colonnes = [
             "KPI",
@@ -87,20 +88,20 @@ if uploaded_file is not None:
 
         st.dataframe(df_results[colonnes])
 
-        # ===================================
+        # =================================================
         # SCORE GLOBAL
-        # ===================================
+        # =================================================
 
         st.subheader("🎯 Score Quantitatif Global")
 
         st.metric(
-            label="Score Quantitatif Global",
-            value=f"{global_score:.2f}"
+            "Score Quantitatif Global",
+            f"{global_score:.2f}"
         )
 
-        # ===================================
+        # =================================================
         # NOTATION
-        # ===================================
+        # =================================================
 
         def get_rating(score):
 
@@ -127,27 +128,23 @@ if uploaded_file is not None:
 
         rating, risk = get_rating(global_score)
 
-        # ===================================
-        # AFFICHAGE NOTATION
-        # ===================================
-
         col1, col2 = st.columns(2)
 
         with col1:
             st.metric(
-                label="Notation",
-                value=rating
+                "Notation",
+                rating
             )
 
         with col2:
             st.metric(
-                label="Niveau de Risque",
-                value=risk
+                "Niveau de Risque",
+                risk
             )
 
-        # ===================================
+        # =================================================
         # SYNTHESE
-        # ===================================
+        # =================================================
 
         st.subheader("📋 Synthèse")
 
@@ -164,14 +161,13 @@ if uploaded_file is not None:
 
             "Niveau de Risque":
             [risk]
-
         })
 
         st.dataframe(synthese_df)
 
-        # ===================================
+        # =================================================
         # EXPORT EXCEL
-        # ===================================
+        # =================================================
 
         output = io.BytesIO()
 
@@ -180,11 +176,19 @@ if uploaded_file is not None:
             engine="openpyxl"
         ) as writer:
 
+            # =============================================
+            # FEUILLE 1 : Z-SCORES
+            # =============================================
+
             df_results.to_excel(
                 writer,
                 sheet_name="Z-Scores",
                 index=False
             )
+
+            # =============================================
+            # FEUILLE 2 : SYNTHESE
+            # =============================================
 
             synthese_df.to_excel(
                 writer,
@@ -192,7 +196,105 @@ if uploaded_file is not None:
                 index=False
             )
 
+            # =============================================
+            # FEUILLE 3 : DASHBOARD
+            # =============================================
+
+            dashboard_df = pd.DataFrame({
+
+                "Indicateur": [
+                    "Nombre de KPI",
+                    "Score Quantitatif Global",
+                    "Score Moyen",
+                    "Z-Score Maximum",
+                    "Z-Score Minimum",
+                    "Score Pondéré Maximum",
+                    "Score Pondéré Moyen"
+                ],
+
+                "Valeur": [
+                    len(df_results),
+                    round(global_score, 2),
+                    round(df_results["Z-Score Calculé"].mean(), 2),
+                    round(df_results["Z-Score Calculé"].max(), 2),
+                    round(df_results["Z-Score Calculé"].min(), 2),
+                    round(df_results["Score Pondéré Calculé"].max(), 2),
+                    round(df_results["Score Pondéré Calculé"].mean(), 2)
+                ]
+            })
+
+            dashboard_df.to_excel(
+                writer,
+                sheet_name="Dashboard",
+                index=False
+            )
+
+            # =============================================
+            # FEUILLE 4 : CLASSEMENT KPI
+            # =============================================
+
+            classement_df = df_results.sort_values(
+                by="Score Pondéré Calculé",
+                ascending=False
+            )
+
+            classement_df.to_excel(
+                writer,
+                sheet_name="Classement KPI",
+                index=False
+            )
+
+            # =============================================
+            # FEUILLE 5 : TOP 5 KPI
+            # =============================================
+
+            top5_df = classement_df.head(5)
+
+            top5_df.to_excel(
+                writer,
+                sheet_name="Top 5 KPI",
+                index=False
+            )
+
+            # =============================================
+            # FEUILLE 6 : COMMENTAIRE
+            # =============================================
+
+            commentaire = f"""
+Score Quantitatif Global : {global_score:.2f}
+
+Notation : {rating}
+
+Niveau de Risque : {risk}
+
+Analyse :
+
+Le score global ressort à {global_score:.2f}.
+La notation obtenue est {rating}.
+Le niveau de risque est évalué à {risk}.
+
+Les KPI les plus contributifs figurent dans
+l'onglet Top 5 KPI.
+
+Cette analyse est basée sur la méthodologie
+de Z-Score appliquée aux données historiques.
+"""
+
+            commentaire_df = pd.DataFrame({
+                "Commentaire": [commentaire]
+            })
+
+            commentaire_df.to_excel(
+                writer,
+                sheet_name="Commentaire",
+                index=False
+            )
+
         excel_file = output.getvalue()
+
+        # =================================================
+        # BOUTON TELECHARGEMENT
+        # =================================================
 
         st.subheader("⬇️ Télécharger les Résultats")
 
@@ -206,7 +308,7 @@ if uploaded_file is not None:
     except Exception as e:
 
         st.error(
-            f"Une erreur est survenue : {e}"
+            f"Erreur durant le traitement : {e}"
         )
 
     finally:
