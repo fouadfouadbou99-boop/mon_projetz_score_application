@@ -1,1 +1,55 @@
+import streamlit as st
+import pandas as pd
+from zscore_calculator import calculate_z_scores
+import os
 
+st.set_page_config(page_title="Application de Calcul de Z-Score", layout="wide")
+
+st.title("📈 Application de Calcul de Z-Score")
+st.write("Veuillez télécharger votre fichier Excel `Z_Score _Approche_V0.xlsx` pour calculer les Z-Scores et le Score Quantitatif Global.")
+
+# Upload du fichier Excel
+uploaded_file = st.file_uploader("Charger le fichier Excel", type=["xlsx"])
+
+if uploaded_file is not None:
+    # Sauvegarder le fichier temporairement pour que la fonction puisse le lire
+    # Streamlit exécute le script à chaque interaction, donc il faut gérer les fichiers temporaires avec soin.
+    temp_file_path = "temp_zscore_data.xlsx"
+    with open(temp_file_path, "wb") as f:
+        f.write(uploaded_file.getbuffer())
+
+    st.success("Fichier chargé avec succès! Calcul des Z-Scores en cours...")
+
+    try:
+        df_results, global_score = calculate_z_scores(temp_file_path)
+
+        st.subheader("📊 Aperçu des Z-Scores Calculés")
+        st.dataframe(df_results[['KPI', 'Poids %', 'N', 'Moyenne Historique Calculée', 'Ecart-Type Calculé', 'Z-Score Calculé', 'Z Ajusté Calculé', 'Score Pondéré Calculé']].head(10))
+
+        st.subheader("🎯 Score Quantitatif Global")
+        st.markdown(f"Le **Score Quantitatif Global** pour l'ensemble du DataFrame est : `<span style='font-size: 24px; color: #28a745;'>{global_score:.3f}</span>`", unsafe_allow_html=True)
+
+        st.subheader("⬇️ Télécharger les Résultats Complets")
+        # Option de téléchargement du DataFrame complet
+        csv_data = df_results.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="Télécharger les Z-Scores en CSV",
+            data=csv_data,
+            file_name="zscore_results.csv",
+            mime="text/csv",
+            help="Téléchargez le DataFrame complet avec tous les calculs de Z-Score."
+        )
+
+    except Exception as e:
+        st.error(f"Une erreur est survenue lors du calcul: {e}")
+
+    finally:
+        # Nettoyer le fichier temporaire après utilisation
+        if os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
+
+else:
+    st.info("Veuillez télécharger un fichier Excel pour lancer les calculs.")
+
+st.markdown("---")
+st.markdown("Développé pour l'automatisation des calculs de Z-Score.")
